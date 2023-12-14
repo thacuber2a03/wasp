@@ -79,6 +79,7 @@ local function read()
 			table.insert(res, o)
 		end
 		nch()
+	elseif c == ')' then err "stray ')'"
 	else
 		while c and not delim() and not space() do add(); nch() end
 		if buf == "t" then
@@ -247,7 +248,7 @@ core = {
 			type = "func",
 			env = copyenv(env),
 			params = params,
-			body = {...}
+			...
 		}
 	end,
 	['if'] = function(env, ...)
@@ -346,13 +347,13 @@ eval = function(o, env)
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "func" then
-		local fnenv = { outer = first.env }
+		if #first.params ~= #o-1 then err "not enough arguments" end
 		for i=2, #o do
-			fnenv[first.params[i-1].sym] = eval(o[i], env)
+			first.env[first.params[i-1].sym]
+				= eval(o[i], env)
 		end
-		return dolist(fnenv, table.unpack(first.body))
+		return dolist(first.env, table.unpack(first))
 	else
-		print(type)
 		err "uncallable object"
 	end
 end
@@ -362,7 +363,7 @@ write = function(o)
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
 		elseif type == "func" then
-			write{sym"func", o.params, table.unpack(o.body)}
+			write{ sym"func", o.params, o }
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end
