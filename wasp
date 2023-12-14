@@ -32,6 +32,14 @@ local qlookup = {
 	[','] = { "comma", "eval" },
 }
 
+local esc = {
+	['"'] = '"',
+	['n'] = '\n',
+	['r'] = '\r',
+	['t'] = '\t',
+	['0'] = '\0',
+}
+
 local END = {}
 local function read()
 	local res, o = lnil, nil ---@type any
@@ -52,6 +60,11 @@ local function read()
 		nch()
 		while c ~= '"' do
 			if not c then err "unclosed string" end
+			if c == '\\' then
+				nch()
+				if not c then err "unclosed string" end
+				c = esc[c] or c
+			end
 			add(); nch()
 		end
 		nch()
