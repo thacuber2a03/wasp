@@ -34,3 +34,6 @@ run it through Lua interpreter:
 ```
 lua wasp
 ```
+
+## extra
+this project is licensed under the [MIT license](LICENSE). contributions are welcome, as long as they add something of value and/or are worth it.
