@@ -32,11 +32,11 @@ return `t` if `a` is numerically less than/less than or equal to `b`.
 
 - `(or ...)`
 
-evaluates each argument, and returns the first one that isn't `nil`; returns said argument and does not evaluate the rest. if no argument isn't `nil`, returns `nil`.
+evaluates each argument, returns the first one that isn't `nil` and does not evaluate the rest. if all arguments are `nil`, returns `nil`.
 
-- `(and...)`
+- `(and ...)`
 
-same as `or`, but returns `nil`. if any argument is `nil`. the last argument is returned if no argument is `nil`.
+same as `or`, but returns `nil` if any argument is `nil`. the last argument is returned if no argument is `nil`.
 
 - `(not v)`
 
@@ -48,7 +48,7 @@ returns `v` as is.
 
 - `(eval v)` (alias `,v`)
 
-evaluates `v`. this should probably be renamed.
+evaluates `v`.
 
 - `(print ...)`
 
@@ -64,7 +64,7 @@ begins a new environment, and evaluates each of it's arguments. returns the last
 
 - `(if condition then ... else?)`
 
-runs each `condition`, and if not `nil`, returns it's respective `then`. if no condition is met, returns `else`, if there is one.
+evaluates each `condition`, and if not `nil`, returns it's respective `then`. if no condition is met, returns `else`, if there is one.
 
 ```clojure
 (set a 3)
@@ -79,7 +79,7 @@ runs each `condition`, and if not `nil`, returns it's respective `then`. if no c
 
 - `(while cond ...)`
 
-evaluates each argument, as long as `cond` isn't `nil`.
+repeatedly evaluates each argument, as long as `cond` isn't `nil`. returns last argument evaluated before the end of the loop.
 
 - `(set sym val ...)`
 
