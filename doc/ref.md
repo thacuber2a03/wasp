@@ -5,7 +5,7 @@ wasp supports:
 - lists
 - symbols
 - strings
-- nil and t
+- `nil` and `t`
 
 strings have no escaping whatsoever; this is being worked on, but as of now, no preprocessing is done on strings beforehand, including escaping double quotes.
 
@@ -32,15 +32,15 @@ return `t` if `a` is numerically less than/less than or equal to `b`.
 
 - `(or ...)`
 
-evaluates each argument, and returns the first one that isn't `nil`; returns said argument and does not evaluate the rest. if no argument is true, returns `nil`.
+evaluates each argument, and returns the first one that isn't `nil`; returns said argument and does not evaluate the rest. if no argument isn't `nil`, returns `nil`.
 
 - `(and...)`
 
-same as `or`, but returns `nil`. if any argument is `nil`. the last argument is returned if all arguments are true.
+same as `or`, but returns `nil`. if any argument is `nil`. the last argument is returned if no argument is `nil`.
 
 - `(not v)`
 
-returns `nil` if val is true, else `nil`.
+returns `nil` if val isn't `nil`, else `t`.
 
 - `(quote v)` (alias `'v`)
 
@@ -60,11 +60,11 @@ compiles all it's arguments into a new list.
 
 - `(do ...)`
 
-opens a new environment, and evaluates each of it's arguments. returns the last one.
+begins a new environment, and evaluates each of it's arguments. returns the last one.
 
 - `(if condition then ... else?)`
 
-runs each condition, and if true, returns it's respective `then`. if no condition is met, returns `else`, if there is one.
+runs each `condition`, and if not `nil`, returns it's respective `then`. if no condition is met, returns `else`, if there is one.
 
 ```clojure
 (set a 3)
@@ -79,7 +79,7 @@ runs each condition, and if true, returns it's respective `then`. if no conditio
 
 - `(while cond ...)`
 
-evaluates each argument, as long as `cond` is true.
+evaluates each argument, as long as `cond` isn't `nil`.
 
 - `(set sym v)`
 
