@@ -4,7 +4,9 @@ so one day I was really bored and in my way to highschool I asked myself "what i
 
 this is what came out of that question, apparently
 
-- check the [language reference](doc/ref.md)
+---
+
+- [language reference](doc/ref.md)
 
 ## requirements
 
