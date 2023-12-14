@@ -14,8 +14,9 @@ local function delim() return c:find"[ \n\t\r;()']" end
 
 local function sym(s) return setmetatable({sym=s},{__tostring=function() return s end}) end
 local function err(e) error(setmetatable({},{__tostring=function() return "error: "..e.."\n" end})) end
-local function atom(o) return o == lnil or o == t or type(o)~='table' or o.sym end
+local function atom(o) return o == lnil or o == t or type(o)~='table' or o.sym or o.type end
 local function issym(o) return type(o)=='table' and o.sym end
+local function hastype(o) return type(o)=='table' and o.type end
 
 local buf, input = "", ""
 
@@ -97,10 +98,11 @@ local write
 
 local function typename(o)
 	if atom(o) then
+		if type(o) == "function" then return "corefunc" end
 		if o == lnil then return "nil" end
 		if o == t then return "t" end
 		if issym(o) then return "symbol" end
-		if type(o) == "function" then return "corefunc" end
+		if hastype(o) then return o.type end
 		return type(o)
 	end
 	return "list"
@@ -164,6 +166,12 @@ local function getenv(env, k)
 	return core[k] or lnil
 end
 
+local function copyenv(env)
+	local newenv = {}
+	for k,v in pairs(env) do newenv[k] = v end
+	return newenv
+end
+
 core = {
 	["+"] = arithop(function(a,b) return a+b end),
 	["-"] = arithop(function(a,b) return a-b end),
@@ -221,6 +229,17 @@ core = {
 	['do'] = function(env, ...)
 		return dolist({ outer = env }, ...)
 	end,
+	['func'] = function(env, params, ...)
+		if not params then err "not enough arguments to 'func'" end
+		check(params, "list")
+		for i=1, #params do check(params[i], "symbol") end
+		return {
+			type = "func",
+			env = copyenv(env),
+			params = params,
+			body = {...}
+		}
+	end,
 	['if'] = function(env, ...)
 		local args = {...}
 		local i = 1
@@ -268,9 +287,14 @@ eval = function(o, env)
 	local type = typename(first)
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
-	elseif type == "function" then
-		-- TODO: implement
+	elseif type == "func" then
+		local fnenv = { outer = first.env }
+		for i=2, #o do
+			fnenv[first.params[i-1].sym] = eval(o[i], env)
+		end
+		return dolist(fnenv, table.unpack(first.body))
 	else
+		print(type)
 		err "uncallable object"
 	end
 end
@@ -279,6 +303,8 @@ write = function(o)
 	if atom(o) then
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
+		elseif type == "func" then
+			write{sym"func", o.params, table.unpack(o.body)}
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end

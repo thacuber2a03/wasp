@@ -5,9 +5,8 @@ wasp supports:
 - lists
 - symbols
 - strings
+- functions
 - `nil` and `t`
-
-strings have no escaping whatsoever; this is being worked on, but as of now, no preprocessing is done on strings beforehand, including escaping double quotes.
 
 comments start with `;`, and run to the end of the line.
 
@@ -61,6 +60,11 @@ compiles all it's arguments into a new list.
 - `(do ...)`
 
 begins a new environment, and evaluates each of it's arguments. returns the last one.
+
+- `(func params ...)`
+
+makes and returns a "func".
+unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures)
 
 - `(if condition then ... else?)`
 
