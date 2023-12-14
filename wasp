@@ -28,8 +28,8 @@ local function nch()
 end
 
 local qlookup = {
-	["'"] = "quote",
-	[','] = "unquote",
+	["'"] = { "quote", "quote" },
+	[','] = { "comma", "eval" },
 }
 
 local END = {}
@@ -42,8 +42,8 @@ local function read()
 	if qlookup[c] then
 		local q = qlookup[c]; nch()
 		o = read()
-		if o == END then err("stray "..q) end
-		res = {sym(q), o}
+		if o == END then err("stray "..q[1]) end
+		res = {sym(q[2]), o}
 	elseif c == ';' then
 		while c and c ~= '\n' do nch() end
 		res = read()
@@ -183,7 +183,7 @@ core = {
 	["not"] = function(env, o) return tobool(not frombool(eval(o, env))) end,
 
 	["quote"] = function(_, o) return o end,
-	["unquote"] = function(env, o) return eval(o, env) end,
+	["eval"] = function(env, o) return eval(o, env) end,
 	["print"] = function(env, ...)
 		local args = {...}
 		for i,v in ipairs(args) do

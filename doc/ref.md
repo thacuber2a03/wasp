@@ -46,7 +46,7 @@ returns `nil` if val isn't `nil`, else `t`.
 
 returns `v` as is.
 
-- `(unquote v)` (alias `,v`)
+- `(eval v)` (alias `,v`)
 
 evaluates `v`. this should probably be renamed.
 
