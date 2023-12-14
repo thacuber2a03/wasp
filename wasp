@@ -224,12 +224,15 @@ core = {
 	["def"] = function(env, var, val)
 		globals[check(var, "symbol").sym] = eval(val, env)
 	end,
-	["set"] = function(env, var, val)
-		val = eval(val, env)
-		local s = check(var, "symbol").sym
-		local _, e = getenv(env, s)
-		if e then e[s] = val else env[s] = val end
-		return val
+	["set"] = function(env, ...)
+		local args = {...}
+		if #args % 2 ~= 0 then err "not enough values for each variable" end
+		for i=1, #args, 2 do
+			local v = eval(args[i+1], env)
+			local s = check(args[i], "symbol").sym
+			local _, e = getenv(env, s)
+			if e then e[s] = v else env[s] = v end
+		end
 	end,
 }
 

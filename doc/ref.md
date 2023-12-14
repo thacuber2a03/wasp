@@ -74,17 +74,23 @@ runs each `condition`, and if not `nil`, returns it's respective `then`. if no c
     (= a 3) (print "three")
     (print "idk")
 )
-; output: three
+; three
 ```
 
 - `(while cond ...)`
 
 evaluates each argument, as long as `cond` isn't `nil`.
 
-- `(set sym v)`
+- `(set sym val ...)`
 
-tries to find and set `sym` in this environment. if it can't find it, searches all previous environments. if it still can't find it, binds `v` to `sym` in the current environment.
+tries to find and set `sym` in this environment. if it can't find it, searches all previous environments. if it still can't find it, binds `val` to `sym` in the current environment.
+repeats for every other pair of `sym`s and `val`s there is.
 
-- `(def sym v)`
+```
+(set a 1 b 2 c (+ a b))
+(print a b c) ; 1 2 3
+```
 
-misleadingly named, binds `v` to `sym` in the global environment.
+- `(def sym val)`
+
+misleadingly named, binds `val` to `sym` in the global environment.
