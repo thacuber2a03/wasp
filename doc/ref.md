@@ -124,3 +124,8 @@ if `l` is `nil`, returns a list with just `v` in it.
 - `(concat a b)`
 
 concatenates lists `a` and `b`.
+
+- `(slice v a b)`
+
+takes a subcopy of a list or a string from `a` to `b`.
+negative indices are also accepted, with -1 being the value's end.

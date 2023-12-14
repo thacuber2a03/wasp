@@ -114,6 +114,8 @@ local function check(o, type)
 	return o
 end
 
+local function default(o, d) if o == lnil then return d end; return o end
+
 local function tobool(v) return v and t or lnil end
 local function frombool(o) return o ~= lnil end
 
@@ -170,6 +172,14 @@ local function copyenv(env)
 	local newenv = {}
 	for k,v in pairs(env) do newenv[k] = v end
 	return newenv
+end
+
+local function normidx(i, l)
+	if i < 0 then
+		while i < 0 do i=i+l end
+		return i+1
+	end
+	return math.max(1, i)
 end
 
 core = {
@@ -295,14 +305,12 @@ core = {
 		end
 		return #v
 	end,
-
 	["cons"] = function(env, v, l)
 		v = eval(v, env); l = eval(l, env)
 		if typename(l) == "nil" then return {v} end
 		if typename(l) ~= "list" then return {v, l} end
 		return { v, table.unpack(l) }
 	end,
-
 	["concat"] = function(env, l, m)
 		local res = { table.unpack(check(eval(l, env), "list")) }
 		for _,v in ipairs(check(eval(m, env), "list")) do
@@ -310,12 +318,25 @@ core = {
 		end
 		return res
 	end,
+	["slice"] = function(env, v, a, b)
+		v = eval(v, env)
+		local type = typename(v)
+		if type ~= "list" and type ~= "string" then
+			err("expected list or string, got "..type)
+		end
+		a = normidx(check(default(eval(a, env), 01), "number"), #v)
+		b = normidx(check(default(eval(b, env), #v), "number"), #v)
+		if type == "string" then return v:sub(a, b) end
+		local res = {}
+		for i=a, b do res[i-a+1] = v[i] end
+		return res
+	end,
 }
 
 eval = function(o, env)
 	if atom(o) then
 		if issym(o) then return getenv(env, o.sym) end
-		return o
+		return o or lnil
 	end
 
 	local first = eval(o[1], env)
