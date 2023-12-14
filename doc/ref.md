@@ -114,3 +114,13 @@ returns `t` if `v` is a list, and `nil` otherwise.
 - `(length v)`
 
 returns the length of a list or a string.
+
+- `(cons v l)`
+
+inserts `v` at the back of `l`.
+if `l` is not a list, returns a list with both values inside.
+if `l` is `nil`, returns a list with just `v` in it.
+
+- `(concat a b)`
+
+concatenates lists `a` and `b`.

@@ -295,6 +295,21 @@ core = {
 		end
 		return #v
 	end,
+
+	["cons"] = function(env, v, l)
+		v = eval(v, env); l = eval(l, env)
+		if typename(l) == "nil" then return {v} end
+		if typename(l) ~= "list" then return {v, l} end
+		return { v, table.unpack(l) }
+	end,
+
+	["concat"] = function(env, l, m)
+		local res = { table.unpack(check(eval(l, env), "list")) }
+		for _,v in ipairs(check(eval(m, env), "list")) do
+			res[#res+1] = v
+		end
+		return res
+	end,
 }
 
 eval = function(o, env)
