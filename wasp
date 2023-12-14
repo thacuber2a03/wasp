@@ -42,6 +42,7 @@ local esc = {
 }
 
 local END = {}
+local rparen = {}
 local function read()
 	local res, o = lnil, nil ---@type any
 
@@ -73,13 +74,15 @@ local function read()
 	elseif c == '(' then
 		nch()
 		res = {}
-		while c ~= ')' do
+		while true do
 			o = read()
 			if o == END then err "unclosed list" end
+			if o == rparen then break end
 			table.insert(res, o)
 		end
+	elseif c == ')' then
 		nch()
-	elseif c == ')' then err "stray ')'"
+		res = rparen
 	else
 		while c and not delim() and not space() do add(); nch() end
 		if buf == "t" then
@@ -169,12 +172,6 @@ local function getenv(env, k)
 	return core[k] or lnil
 end
 
-local function copyenv(env)
-	local newenv = {}
-	for k,v in pairs(env) do newenv[k] = v end
-	return newenv
-end
-
 local function normidx(i, l)
 	if i < 0 then
 		while i < 0 do i=i+l end
@@ -246,7 +243,7 @@ core = {
 		for i=1, #params do check(params[i], "symbol") end
 		return {
 			type = "func",
-			env = copyenv(env),
+			env = env,
 			params = params,
 			...
 		}
@@ -336,6 +333,12 @@ core = {
 	end,
 }
 
+local function copyenv(env)
+	local newenv = {}
+	for k,v in pairs(env) do newenv[k] = v end
+	return newenv
+end
+
 eval = function(o, env)
 	if atom(o) then
 		if issym(o) then return getenv(env, o.sym) end
@@ -347,12 +350,13 @@ eval = function(o, env)
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "func" then
+		local fnenv = { outer = first.env }
 		if #first.params ~= #o-1 then err "not enough arguments" end
 		for i=2, #o do
-			first.env[first.params[i-1].sym]
-				= eval(o[i], env)
+			fnenv[first.params[i-1].sym]
+				= eval(o[i], fnenv)
 		end
-		return dolist(first.env, table.unpack(first))
+		return dolist(fnenv, table.unpack(first))
 	else
 		err "uncallable object"
 	end
@@ -385,7 +389,9 @@ repeat
 	xpcall(function()
 		while input ~= "" do
 			nch()
-			local v = eval(read(), globals)
+			local r = read()
+			if r == rparen then err "stray ')'" end
+			local v = eval(r, globals)
 			if not file then
 				write(v)
 				io.write'\n'
