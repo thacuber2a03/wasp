@@ -106,6 +106,7 @@ returns the first item in a list.
 - `(rest list)`
 
 returns a new list with all the items that are after the first item in `list`.
+returns `nil` if there's nothing after the first item.
 
 - `(list? v)`
 

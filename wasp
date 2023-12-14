@@ -290,9 +290,11 @@ core = {
 		return check(eval(list, env), "list")[1]
 	end,
 	["rest"] = function(env, list)
-		return { select(2,
+		local res = { select(2,
 			table.unpack(check(eval(list, env), "list"))
 		) }
+		if #res == 0 then return lnil end
+		return res
 	end,
 	["list?"] = function(env, v)
 		return tobool(typename(eval(v, env)) == "list")
