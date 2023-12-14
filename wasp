@@ -120,15 +120,13 @@ local function equal(env, a, b)
 	return tobool(a == b)
 end
 
-local function operator(f, anyVal)
+local function arithop(f, anyVal)
 	-- just a fancy "reduce"
 	return function(env, ...)
 		local args = {...}
 		local acc = eval(args[1], env)
-		if not anyVal then check(acc, "number") end
 		for i=2, #args do
 			local v = eval(args[i], env)
-			if not anyVal then check(v, "number") end
 			acc = f(acc, v)
 		end
 		return acc
@@ -154,16 +152,25 @@ local function getenv(env, k)
 end
 
 core = {
-	["+"] = operator(function(a,b) return a+b end),
-	["-"] = operator(function(a,b) return a-b end),
-	["*"] = operator(function(a,b) return a*b end),
-	["/"] = operator(function(a,b)
+	["+"] = arithop(function(a,b) return a+b end),
+	["-"] = arithop(function(a,b) return a-b end),
+	["*"] = arithop(function(a,b) return a*b end),
+	["/"] = arithop(function(a,b)
 		if b == 0 then err "division by zero" end
 		return a/b
 	end),
+
 	['=']  = equal,
-	["<"]  = function(env, a, b) return tobool(check(eval(a, env), "number") <  check(eval(b, env), "number")) end,
-	["<="] = function(env, a, b) return tobool(check(eval(a, env), "number") <= check(eval(b, env), "number")) end,
+	["<"]  = function(env, a, b)
+		a = check(eval(a, env), "number")
+		b = check(eval(b, env), "number")
+		return tobool(a < b)
+	end,
+	["<="] = function(env, a, b)
+		a = check(eval(a, env), "number")
+		b = check(eval(b, env), "number")
+		return tobool(a <= b)
+	end,
 	["or"] = function(env, ...)
 		local res
 		for _, v in ipairs{...} do
@@ -198,7 +205,9 @@ core = {
 		return res
 	end,
 
-	['do'] = function(env, ...) return dolist({ outer = env }, ...) end,
+	['do'] = function(env, ...)
+		return dolist({ outer = env }, ...)
+	end,
 	['if'] = function(env, ...)
 		local args = {...}
 		local i = 1
@@ -226,7 +235,7 @@ core = {
 	end,
 	["set"] = function(env, ...)
 		local args = {...}
-		if #args % 2 ~= 0 then err "not enough values for each variable" end
+		if #args % 2 ~= 0 then err "not enough values for each key" end
 		for i=1, #args, 2 do
 			local v = eval(args[i+1], env)
 			local s = check(args[i], "symbol").sym
@@ -245,9 +254,9 @@ eval = function(o, env)
 	local first = eval(o[1], env)
 	local type = typename(first)
 	if type == "corefunc" then
-		return first(env, select(2, table.unpack(o)))
+		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "function" then
-		-- todo
+		-- TODO: implement
 	else
 		err "uncallable object"
 	end
