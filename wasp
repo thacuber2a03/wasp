@@ -1,0 +1,285 @@
+#!/bin/env lua
+local file = nil
+if #arg >= 1 then file = io.open(arg[1], "rb") end
+
+local lnil = {}
+local t = {}
+
+local c
+
+local function wstr(o) return io.write(tostring(o)) end
+
+local function space() return c:find'[ \n\t\r]' end
+local function delim() return c:find"[ \n\t\r;()']" end
+
+local function sym(s) return setmetatable({sym=s},{__tostring=function() return s end}) end
+local function err(e) error(setmetatable({},{__tostring=function() return "error: "..e.."\n" end})) end
+local function atom(o) return o == lnil or o == t or type(o)~='table' or o.sym end
+local function issym(o) return type(o)=='table' and o.sym end
+
+local buf, input = "", ""
+
+local function add() buf = buf .. c end
+
+local function nch()
+	c = input ~= "" and input:sub(1,1) or nil
+	input = input:sub(2,-1)
+	return c
+end
+
+local qlookup = {
+	["'"] = "quote",
+	[','] = "unquote",
+}
+
+local END = {}
+local function read()
+	local res, o = lnil, nil ---@type any
+
+	while c and space() do nch() end
+	if not c then return END end
+
+	if qlookup[c] then
+		local q = qlookup[c]; nch()
+		o = read()
+		if o == END then err("stray "..q) end
+		res = {sym(q), o}
+	elseif c == ';' then
+		while c and c ~= '\n' do nch() end
+		res = read()
+		if res == END then res = lnil end
+	elseif c == '"' then
+		nch()
+		while c ~= '"' do
+			if not c then err "unclosed string" end
+			add(); nch()
+		end
+		nch()
+		res = buf
+	elseif c == '(' then
+		nch()
+		res = {}
+		while c ~= ')' do
+			o = read()
+			if o == END then err "unclosed list" end
+			table.insert(res, o)
+		end
+		nch()
+	else
+		while c and not delim() and not space() do add(); nch() end
+		if buf == "t" then
+			res = t
+		elseif buf ~= "nil" then
+			res = tonumber(buf)
+			if not res then res = sym(buf) end
+		end
+	end
+
+	buf = ""
+	return res
+end
+
+local eval
+local write
+
+local function typename(o)
+	if atom(o) then
+		if o == lnil then return "nil" end
+		if o == t then return "t" end
+		if issym(o) then return "symbol" end
+		if type(o) == "function" then return "corefunc" end
+		return type(o)
+	end
+	return "list"
+end
+
+local function check(o, type)
+	local g = typename(o)
+	if g ~= type then err("expected "..type..", got "..g) end
+	return o
+end
+
+local function tobool(v) return v and t or lnil end
+local function frombool(o) return o ~= lnil end
+
+local function equal(env, a, b)
+	a = eval(a, env); b = eval(b, env)
+	local type = typename(a)
+	if type ~= typename(b) then return lnil end
+
+	if type == "list" then
+		if #a ~= #b then return lnil end
+		for i=1, #a do
+			if typename(a[i]) ~= typename(b[i]) then return lnil end
+		end
+		return t
+	elseif type == "symbol" then
+		return tobool(a.sym == b.sym)
+	end
+
+	return tobool(a == b)
+end
+
+local function operator(f, anyVal)
+	-- just a fancy "reduce"
+	return function(env, ...)
+		local args = {...}
+		local acc = eval(args[1], env)
+		if not anyVal then check(acc, "number") end
+		for i=2, #args do
+			local v = eval(args[i], env)
+			if not anyVal then check(v, "number") end
+			acc = f(acc, v)
+		end
+		return acc
+	end
+end
+
+local function dolist(env, ...)
+	local res
+	for _,v in ipairs{...} do res = eval(v, env) end
+	return res
+end
+
+local core
+local globals = {}
+
+local function getenv(env, k)
+	if env[k] then
+		return env[k], env
+	elseif env.outer then
+		return getenv(env.outer, k)
+	end
+	return core[k] or lnil
+end
+
+core = {
+	["+"] = operator(function(a,b) return a+b end),
+	["-"] = operator(function(a,b) return a-b end),
+	["*"] = operator(function(a,b) return a*b end),
+	["/"] = operator(function(a,b)
+		if b == 0 then err "division by zero" end
+		return a/b
+	end),
+	['=']  = equal,
+	["<"]  = function(env, a, b) return tobool(check(eval(a, env), "number") <  check(eval(b, env), "number")) end,
+	["<="] = function(env, a, b) return tobool(check(eval(a, env), "number") <= check(eval(b, env), "number")) end,
+	["or"] = function(env, ...)
+		local res
+		for _, v in ipairs{...} do
+			res = eval(v, env)
+			if v ~= lnil then return res end
+		end
+		return res
+	end,
+	["and"] = function(env, ...)
+		local res
+		for _, v in ipairs{...} do
+			res = eval(v, env)
+			if v == lnil then return res end
+		end
+		return res
+	end,
+	["not"] = function(env, o) return tobool(not frombool(eval(o, env))) end,
+
+	["quote"] = function(_, o) return o end,
+	["unquote"] = function(env, o) return eval(o, env) end,
+	["print"] = function(env, ...)
+		local args = {...}
+		for i,v in ipairs(args) do
+			write(eval(v, env))
+			if i~=#args then wstr' ' end
+		end
+		wstr'\n'
+	end,
+	["list"] = function(env, ...)
+		local res = {}
+		for i,v in ipairs{...} do res[i] = eval(v, env) end
+		return res
+	end,
+
+	['do'] = function(env, ...) return dolist({ outer = env }, ...) end,
+	['if'] = function(env, ...)
+		local args = {...}
+		local i = 1
+		while i <= #args do
+			local cond = eval(args[i], env)
+			if cond ~= lnil then
+				return (i+1 <= #args)
+					and eval(args[i + 1], env)
+					or cond
+			end
+			i = i + 2
+		end
+	end,
+	['while'] = function(env, ...)
+		local res
+		local cond = (select(1, ...))
+		while frombool(eval(cond, env)) do
+			res = dolist({ outer = env }, select(2, ...))
+		end
+		return res
+	end,
+
+	["def"] = function(env, var, val)
+		globals[check(var, "symbol").sym] = eval(val, env)
+	end,
+	["set"] = function(env, var, val)
+		val = eval(val, env)
+		local s = check(var, "symbol").sym
+		local _, e = getenv(env, s)
+		if e then e[s] = val else env[s] = val end
+		return val
+	end,
+}
+
+eval = function(o, env)
+	if atom(o) then
+		if issym(o) then return getenv(env, o.sym) end
+		return o
+	end
+
+	local first = eval(o[1], env)
+	local type = typename(first)
+	if type == "corefunc" then
+		return first(env, select(2, table.unpack(o)))
+	elseif type == "function" then
+		-- todo
+	else
+		err "uncallable object"
+	end
+end
+
+write = function(o)
+	if atom(o) then
+		local type = typename(o)
+		if type == "corefunc" then wstr "<corefunc>"
+		elseif type == "t" then wstr "t"
+		elseif type == "nil" then wstr "nil"
+		else wstr(o) end
+	else
+		wstr'('
+		for i=1,#o do
+			write(o[i])
+			if i~=#o then wstr' ' end
+		end
+		wstr')'
+	end
+end
+
+repeat
+	if not file then io.write"> " end
+	input = file and file:read "a" or io.read()
+	if not input then break end
+
+	xpcall(function()
+		while input ~= "" do
+			nch()
+			local v = eval(read(), globals)
+			if not file then
+				write(v)
+				io.write'\n'
+			end
+		end
+	end, wstr)
+until file

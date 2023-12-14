@@ -1,0 +1,10 @@
+(def x 0)
+(def y 1)
+(def z 0)
+
+(while (< z 255)
+	(set z (+ x y))
+	(set x y)
+	(set y z)
+	(print z)
+)
