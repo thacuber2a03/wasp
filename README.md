@@ -16,7 +16,8 @@ this is what came out of that question, apparently
 ## todo
 
 - [ ] implement functions and macros
-- [ ] some more list manipulation functions
+- [ ] more list manipulation functions
+- [ ] more string manipulation functions
 - [ ] make it ***smaller***
 
 ## running

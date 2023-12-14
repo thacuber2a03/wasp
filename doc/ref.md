@@ -98,3 +98,19 @@ repeats for every other pair of `sym`s and `val`s there is.
 - `(def sym val)`
 
 misleadingly named, binds `val` to `sym` in the global environment.
+
+- `(first list)`
+
+returns the first item in a list.
+
+- `(rest list)`
+
+returns a new list with all the items that are after the first item in `list`.
+
+- `(list? v)`
+
+returns `t` if `v` is a list, and `nil` otherwise.
+
+- `(length v)`
+
+returns the length of a list or a string.

@@ -275,6 +275,26 @@ core = {
 			if e then e[s] = v else env[s] = v end
 		end
 	end,
+
+	["first"] = function(env, list)
+		return check(eval(list, env), "list")[1]
+	end,
+	["rest"] = function(env, list)
+		return { select(2,
+			table.unpack(check(eval(list, env), "list"))
+		) }
+	end,
+	["list?"] = function(env, v)
+		return tobool(typename(eval(v, env)) == "list")
+	end,
+	["length"] = function(env, v)
+		v = eval(v, env)
+		local type = typename(v)
+		if type ~= "string" and type ~= "list" then
+			err("expected string or list, got "..type)
+		end
+		return #v
+	end,
 }
 
 eval = function(o, env)
