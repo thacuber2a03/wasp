@@ -86,7 +86,7 @@ evaluates each argument, as long as `cond` isn't `nil`.
 tries to find and set `sym` in this environment. if it can't find it, searches all previous environments. if it still can't find it, binds `val` to `sym` in the current environment.
 repeats for every other pair of `sym`s and `val`s there is.
 
-```
+```clojure
 (set a 1 b 2 c (+ a b))
 (print a b c) ; 1 2 3
 ```
