@@ -2,9 +2,7 @@
 local file = nil
 if #arg >= 1 then file = io.open(arg[1], "rb") end
 
-local lnil = {}
-local t = {}
-
+local lnil, t
 local c
 
 local function wstr(o) return io.write(tostring(o)) end
@@ -14,9 +12,12 @@ local function delim() return c:find"[ \n\t\r;()']" end
 
 local function sym(s) return setmetatable({sym=s},{__tostring=function() return s end}) end
 local function err(e) error(setmetatable({},{__tostring=function() return "error: "..e.."\n" end})) end
+local function mkenv(p) return { outer = p, data = {} } end
 local function atom(o) return o == lnil or o == t or type(o)~='table' or o.sym or o.type end
 local function issym(o) return type(o)=='table' and o.sym end
 local function hastype(o) return type(o)=='table' and o.type end
+
+lnil, t = sym "lnil", sym "t"
 
 local buf, input = "", ""
 
@@ -97,8 +98,8 @@ local function read()
 	return res
 end
 
-local eval
-local write
+local eval, write, core
+local globals = mkenv()
 
 local function typename(o)
 	if atom(o) then
@@ -160,12 +161,20 @@ local function dolist(env, ...)
 	return res
 end
 
-local core
-local globals = {}
+local function cpenv(env)
+	local newenv = mkenv()
+	for k,v in pairs(env) do
+		if v.data then newenv.data[k] = cpenv(v)
+		else newenv.data[k] = v end
+	end
+	return newenv
+end
+
+local function setenv(e, k, v) e.data[k] = v end
 
 local function getenv(env, k)
-	if env[k] then
-		return env[k], env
+	if env.data[k] then
+		return env.data[k], env
 	elseif env.outer then
 		return getenv(env.outer, k)
 	end
@@ -235,15 +244,14 @@ core = {
 	end,
 
 	['do'] = function(env, ...)
-		return dolist({ outer = env }, ...)
+		return dolist(mkenv(env), ...)
 	end,
 	['func'] = function(env, params, ...)
 		if not params then err "not enough arguments to 'func'" end
-		check(params, "list")
-		for i=1, #params do check(params[i], "symbol") end
+		check(params, "list"); for i=1, #params do check(params[i], "symbol") end
 		return {
 			type = "func",
-			env = env,
+			env = cpenv(env),
 			params = params,
 			...
 		}
@@ -265,7 +273,7 @@ core = {
 		local res
 		local cond = (select(1, ...))
 		while frombool(eval(cond, env)) do
-			res = dolist({ outer = env }, select(2, ...))
+			res = dolist(mkenv(env), select(2, ...))
 		end
 		return res
 	end,
@@ -280,7 +288,7 @@ core = {
 			local v = eval(args[i+1], env)
 			local s = check(args[i], "symbol").sym
 			local _, e = getenv(env, s)
-			if e then e[s] = v else env[s] = v end
+			setenv(e or env, s, v)
 		end
 	end,
 
@@ -333,12 +341,6 @@ core = {
 	end,
 }
 
-local function copyenv(env)
-	local newenv = {}
-	for k,v in pairs(env) do newenv[k] = v end
-	return newenv
-end
-
 eval = function(o, env)
 	if atom(o) then
 		if issym(o) then return getenv(env, o.sym) end
@@ -350,13 +352,11 @@ eval = function(o, env)
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "func" then
-		local fnenv = { outer = first.env }
 		if #first.params ~= #o-1 then err "not enough arguments" end
 		for i=2, #o do
-			fnenv[first.params[i-1].sym]
-				= eval(o[i], fnenv)
+			setenv(first.env, first.params[i-1].sym, eval(o[i], first.env))
 		end
-		return dolist(fnenv, table.unpack(first))
+		return dolist(first.env, table.unpack(first))
 	else
 		err "uncallable object"
 	end
