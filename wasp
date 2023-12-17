@@ -1,6 +1,5 @@
 #!/bin/env lua
-local file = nil
-if #arg >= 1 then file = io.open(arg[1], "rb") end
+local file; if #arg >= 1 then file = io.open(arg[1], "rb") end
 
 local lnil, t
 local c
@@ -155,9 +154,17 @@ local function arithop(f, anyVal)
 	end
 end
 
+--- TODO(thacuber2a03): these two functions are basically the same thing
+
 local function dolist(env, ...)
 	local res
 	for _,v in ipairs{...} do res = eval(v, env) end
+	return res
+end
+
+local function evallist(env, ...)
+	local res = {}
+	for i,v in ipairs{...} do res[i] = eval(v, env) end
 	return res
 end
 
@@ -183,7 +190,15 @@ end
 
 local function closure(t, env, params, ...)
 	if not params then err "not enough arguments to 'func'" end
-	check(params, "list"); for i=1, #params do check(params[i], "symbol") end
+	check(params, "list")
+	for i=1, #params do
+		check(params[i], "symbol")
+		if params[i].sym == "&" then
+			if not params[i + 1] then err "expected symbol after '&'" end
+			if i + 1 ~= #params then err "params after '& sym'" end
+			break
+		end
+	end
 	return {
 		type = t,
 		env = cpenv(env),
@@ -248,15 +263,9 @@ core = {
 		end
 		wstr'\n'
 	end,
-	["list"] = function(env, ...)
-		local res = {}
-		for i,v in ipairs{...} do res[i] = eval(v, env) end
-		return res
-	end,
+	["list"] = function(env, ...) return evallist(env, ...) end,
 
-	['do'] = function(env, ...)
-		return dolist(mkenv(env), ...)
-	end,
+	['do'] = function(env, ...) return dolist(mkenv(env), ...) end,
 	['func'] = function(env, params, ...) return closure("func", env, params, ...) end,
 	['macro'] = function(env, params, ...) return closure("macro", env, params, ...) end,
 	['if'] = function(env, ...)
@@ -284,6 +293,7 @@ core = {
 	["def"] = function(env, var, val)
 		globals[check(var, "symbol").sym] = eval(val, env)
 	end,
+
 	["set"] = function(env, ...)
 		local args = {...}
 		if #args % 2 ~= 0 then err "not enough values for each key" end
@@ -295,16 +305,14 @@ core = {
 		end
 	end,
 
-	["first"] = function(env, list)
-		return check(eval(list, env), "list")[1]
-	end,
+	["first"] = function(env, list) return check(eval(list, env), "list")[1] end,
+
 	["rest"] = function(env, list)
-		local res = { select(2,
-			table.unpack(check(eval(list, env), "list"))
-		) }
+		local res = { select(2, table.unpack(check(eval(list, env), "list"))) }
 		if #res == 0 then return lnil end
 		return res
 	end,
+
 	["list?"] = function(env, v)
 		return tobool(typename(eval(v, env)) == "list")
 	end,
@@ -354,11 +362,16 @@ eval = function(o, env)
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "func" or ismac then
-		if #first.params ~= #o-1 then err "not enough arguments" end
 		for i=2, #o do
-			local v = o[i]
-			if not ismac then v = eval(v, first.env) end
-			setenv(first.env, first.params[i-1].sym, v)
+			local v = eval(o[i], env)
+			local s = first.params[i-1].sym
+			if s == '&' then
+				s = first.params[i].sym
+				setenv(first.env, s, evallist(env, select(i, table.unpack(o))))
+				break
+			else
+				setenv(first.env, s, v)
+			end
 		end
 		local res = dolist(first.env, table.unpack(first))
 		if ismac then res = eval(res, env) end
@@ -372,8 +385,7 @@ write = function(o)
 	if atom(o) then
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
-		elseif type == "func" then
-			write{ sym"func", o.params, o }
+		elseif type == "func" then write{ sym"func", o.params, o }
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end

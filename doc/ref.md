@@ -6,6 +6,7 @@ wasp supports:
 - symbols
 - strings
 - functions
+- macros
 - `nil` and `t`
 
 comments start with `;`, and run to the end of the line.
@@ -61,15 +62,16 @@ compiles all it's arguments into a new list.
 
 begins a new environment, and evaluates each of it's arguments. returns the last one.
 
-- `(func params ...)`
+- `(func params ... & rest)`
 
 makes and returns a "func".
-unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures)
+unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures).
+the `rest` argument is a symbol that holds all extra arguments passed to the function.
 
-- `(macro params ...)`
+- `(macro params ... & rest)`
 
 makes and returns a "macro".
-macros are like funcs, but their contents are evaluated *twice*, one to get the code to evaluate and another to actually evaluate it. this behavior allows metaprogramming, and even adding new syntax, such as another way to declare funcs.
+macros are like funcs, but their contents are evaluated *twice*, one to get the code to evaluate and another to actually evaluate it. this behavior allows metaprogramming, such as adding another way to declare funcs.
 
 - `(if condition then ... else?)`
 
