@@ -66,6 +66,11 @@ begins a new environment, and evaluates each of it's arguments. returns the last
 makes and returns a "func".
 unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures)
 
+- `(macro params ...)`
+
+makes and returns a "macro".
+macros are like funcs, but their contents are evaluated *twice*, one to get the code to evaluate and another to actually evaluate it. this behavior allows metaprogramming, and even adding new syntax, such as another way to declare funcs.
+
 - `(if condition then ... else?)`
 
 evaluates each `condition`, and if not `nil`, returns it's respective `then`. if no condition is met, returns `else`, if there is one.

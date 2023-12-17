@@ -181,6 +181,17 @@ local function getenv(env, k)
 	return core[k] or lnil
 end
 
+local function closure(t, env, params, ...)
+	if not params then err "not enough arguments to 'func'" end
+	check(params, "list"); for i=1, #params do check(params[i], "symbol") end
+	return {
+		type = t,
+		env = cpenv(env),
+		params = params,
+		...
+	}
+end
+
 local function normidx(i, l)
 	if i < 0 then
 		while i < 0 do i=i+l end
@@ -246,16 +257,8 @@ core = {
 	['do'] = function(env, ...)
 		return dolist(mkenv(env), ...)
 	end,
-	['func'] = function(env, params, ...)
-		if not params then err "not enough arguments to 'func'" end
-		check(params, "list"); for i=1, #params do check(params[i], "symbol") end
-		return {
-			type = "func",
-			env = cpenv(env),
-			params = params,
-			...
-		}
-	end,
+	['func'] = function(env, params, ...) return closure("func", env, params, ...) end,
+	['macro'] = function(env, params, ...) return closure("macro", env, params, ...) end,
 	['if'] = function(env, ...)
 		local args = {...}
 		local i = 1
@@ -321,9 +324,7 @@ core = {
 	end,
 	["concat"] = function(env, l, m)
 		local res = { table.unpack(check(eval(l, env), "list")) }
-		for _,v in ipairs(check(eval(m, env), "list")) do
-			res[#res+1] = v
-		end
+		for _,v in ipairs(check(eval(m, env), "list")) do res[#res+1] = v end
 		return res
 	end,
 	["slice"] = function(env, v, a, b)
@@ -349,14 +350,19 @@ eval = function(o, env)
 
 	local first = eval(o[1], env)
 	local type = typename(first)
+	local ismac = type == "macro"
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
-	elseif type == "func" then
+	elseif type == "func" or ismac then
 		if #first.params ~= #o-1 then err "not enough arguments" end
 		for i=2, #o do
-			setenv(first.env, first.params[i-1].sym, eval(o[i], first.env))
+			local v = o[i]
+			if not ismac then v = eval(v, first.env) end
+			setenv(first.env, first.params[i-1].sym, v)
 		end
-		return dolist(first.env, table.unpack(first))
+		local res = dolist(first.env, table.unpack(first))
+		if ismac then res = eval(res, env) end
+		return res
 	else
 		err "uncallable object"
 	end
