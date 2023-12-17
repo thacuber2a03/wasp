@@ -168,16 +168,16 @@ local function evallist(env, ...)
 	return res
 end
 
+local function setenv(e, k, v) e.data[k] = v end
+
 local function cpenv(env)
-	local newenv = mkenv()
+	local newenv = mkenv(env)
 	for k,v in pairs(env) do
-		if v.data then newenv.data[k] = cpenv(v)
-		else newenv.data[k] = v end
+		if type(v)=="table" and v.data then setenv(newenv, k, v)
+		else setenv(newenv, k, v) end
 	end
 	return newenv
 end
-
-local function setenv(e, k, v) e.data[k] = v end
 
 local function getenv(env, k)
 	if env.data[k] then
@@ -363,7 +363,8 @@ eval = function(o, env)
 		return first(env, select(2, table.unpack(o))) or lnil
 	elseif type == "func" or ismac then
 		for i=2, #o do
-			local v = eval(o[i], env)
+			local v = o[i]
+			if not ismac then v = eval(v, env) end
 			local s = first.params[i-1].sym
 			if s == '&' then
 				s = first.params[i].sym
