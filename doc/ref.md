@@ -46,9 +46,13 @@ returns `nil` if val isn't `nil`, else `t`.
 
 returns `v` as is.
 
-- `(eval v)` (alias `,v`)
+- `(unquote v)` (alias `,v`)
 
 evaluates `v`.
+
+- `(eval str)`
+
+evaluates the contents of string `str`.
 
 - `(print ...)`
 

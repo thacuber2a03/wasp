@@ -30,7 +30,7 @@ end
 
 local qlookup = {
 	["'"] = { "quote", "quote" },
-	[','] = { "comma", "eval" },
+	[','] = { "comma", "unquote" },
 }
 
 local esc = {
@@ -172,7 +172,7 @@ local function setenv(e, k, v) e.data[k] = v end
 
 local function cpenv(env)
 	local newenv = mkenv(env)
-	for k,v in pairs(env) do
+	for k,v in pairs(env.data) do
 		if type(v)=="table" and v.data then setenv(newenv, k, v)
 		else setenv(newenv, k, v) end
 	end
@@ -254,7 +254,7 @@ core = {
 	["not"] = function(env, o) return tobool(not frombool(eval(o, env))) end,
 
 	["quote"] = function(_, o) return o end,
-	["eval"] = function(env, o) return eval(o, env) end,
+	["unquote"] = function(env, o) return eval(o, env) end,
 	["print"] = function(env, ...)
 		local args = {...}
 		for i,v in ipairs(args) do
@@ -265,6 +265,20 @@ core = {
 	end,
 	["list"] = function(env, ...) return evallist(env, ...) end,
 
+	['eval'] = function(env, s)
+		require 'debugger'()
+		local res
+		local oldInput = input
+		input = check(eval(s, env), "string")
+		while input ~= "" do
+			nch()
+			local r = read()
+			if r == rparen then err "stray ')'" end
+			res = eval(r, mkenv(globals))
+		end
+		input = oldInput
+		return res
+	end,
 	['do'] = function(env, ...) return dolist(mkenv(env), ...) end,
 	['func'] = function(env, params, ...) return closure("func", env, params, ...) end,
 	['macro'] = function(env, params, ...) return closure("macro", env, params, ...) end,
@@ -386,7 +400,7 @@ write = function(o)
 	if atom(o) then
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
-		elseif type == "func" then write{ sym"func", o.params, o }
+		elseif type == "func" then write{ sym"func", o.params, table.unpack(o) }
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end
