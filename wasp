@@ -246,6 +246,7 @@ core = {
 		wstr'\n'
 	end,
 	["list"] = function(env, ...) return dolist(true, env, ...) end,
+	["type"] = function(env, ...) return typename(eval(({...})[1], env)) end,
 
 	['eval'] = function(env, s)
 		local res

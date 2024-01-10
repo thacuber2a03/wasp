@@ -52,7 +52,11 @@ evaluates `v`.
 
 - `(eval str)`
 
-evaluates the contents of string `str`.
+evaluates string `str`.
+
+- `(type v)`
+
+returns the type of `v`.
 
 - `(print ...)`
 
@@ -66,13 +70,12 @@ compiles all it's arguments into a new list.
 
 begins a new environment, and evaluates each of it's arguments. returns the last one.
 
-- `(func params ... & rest)`
+- `(func params & exprs)`
 
 makes and returns a "func".
 unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures).
-the `rest` argument is a symbol that holds all extra arguments passed to the function.
 
-- `(macro params ... & rest)`
+- `(macro params & exprs)`
 
 makes and returns a "macro".
 macros are like funcs, but their contents are evaluated *twice*, one to get the code to evaluate and another to actually evaluate it. this behavior allows metaprogramming, such as adding another way to declare funcs.
