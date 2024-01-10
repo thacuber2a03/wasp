@@ -170,12 +170,6 @@ end
 
 local function setenv(e, k, v) e.data[k] = v end
 
-local function cpenv(env)
-	local newenv = mkenv(env)
-	for k,v in pairs(env.data) do setenv(newenv, k, v) end
-	return newenv
-end
-
 local function getenv(env, k)
 	if env.data[k] then
 		return env.data[k], env
@@ -196,7 +190,7 @@ local function closure(type, env, params, ...)
 			break
 		end
 	end
-	return { type = type, env = cpenv(env), params = params, ... }
+	return { type = type, env = env, params = params, ... }
 end
 
 local function normidx(i, l)
