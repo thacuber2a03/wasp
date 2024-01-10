@@ -154,17 +154,13 @@ local function arithop(f)
 	end
 end
 
---- TODO(thacuber2a03): these two functions are basically the same thing
-
-local function dolist(env, ...)
+local function dolist(evlst, env, ...)
 	local res
-	for _,v in ipairs{...} do res = eval(v, env) end
-	return res
-end
-
-local function evallist(env, ...)
-	local res = {}
-	for i,v in ipairs{...} do res[i] = eval(v, env) end
+	if evlst then res = {} end
+	for i,v in ipairs{...} do
+		v = eval(v, env)
+		if evlst then res[i] = v else res = v end
+	end
 	return res
 end
 
@@ -249,7 +245,7 @@ core = {
 		end
 		wstr'\n'
 	end,
-	["list"] = function(env, ...) return evallist(env, ...) end,
+	["list"] = function(env, ...) return dolist(true, env, ...) end,
 
 	['eval'] = function(env, s)
 		local res
@@ -264,7 +260,7 @@ core = {
 		input = oldInput
 		return res
 	end,
-	['do'] = function(env, ...) return dolist(mkenv(env), ...) end,
+	['do'] = function(env, ...) return dolist(false, mkenv(env), ...) end,
 	['func'] = function(env, params, ...) return closure("func", env, params, ...) end,
 	['macro'] = function(env, params, ...) return closure("macro", env, params, ...) end,
 	['if'] = function(env, ...)
@@ -284,7 +280,7 @@ core = {
 		local res
 		local cond = (select(1, ...))
 		while frombool(eval(cond, env)) do
-			res = dolist(mkenv(env), select(2, ...))
+			res = dolist(false, mkenv(env), select(2, ...))
 		end
 		return res
 	end,
@@ -367,13 +363,13 @@ eval = function(o, env)
 			local s = first.params[i-1].sym
 			if s == '&' then
 				s = first.params[i].sym
-				setenv(first.env, s, evallist(env, select(i, table.unpack(o))))
+				setenv(first.env, s, dolist(true, env, select(i, table.unpack(o))))
 				break
 			else
 				setenv(first.env, s, v)
 			end
 		end
-		local res = dolist(first.env, table.unpack(first))
+		local res = dolist(false, first.env, table.unpack(first))
 		if ismac then res = eval(res, env) end
 		return res
 	else
