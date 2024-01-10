@@ -141,13 +141,13 @@ local function equal(env, a, b)
 	return tobool(a == b)
 end
 
-local function arithop(f, anyVal)
+local function arithop(f)
 	-- just a fancy "reduce"
 	return function(env, ...)
 		local args = {...}
-		local acc = eval(args[1], env)
+		local acc = check(eval(args[1], env), "number")
 		for i=2, #args do
-			local v = eval(args[i], env)
+			local v = check(eval(args[i], env), "number")
 			acc = f(acc, v)
 		end
 		return acc
@@ -172,10 +172,7 @@ local function setenv(e, k, v) e.data[k] = v end
 
 local function cpenv(env)
 	local newenv = mkenv(env)
-	for k,v in pairs(env.data) do
-		if type(v)=="table" and v.data then setenv(newenv, k, v)
-		else setenv(newenv, k, v) end
-	end
+	for k,v in pairs(env.data) do setenv(newenv, k, v) end
 	return newenv
 end
 
@@ -188,23 +185,18 @@ local function getenv(env, k)
 	return core[k] or lnil
 end
 
-local function closure(t, env, params, ...)
+local function closure(type, env, params, ...)
 	if not params then err "not enough arguments to 'func'" end
 	check(params, "list")
 	for i=1, #params do
 		check(params[i], "symbol")
 		if params[i].sym == "&" then
-			if not params[i + 1] then err "expected symbol after '&'" end
+			if typename(params[i + 1]) ~= "symbol" then err "expected symbol after '&'" end
 			if i + 1 ~= #params then err "params after '& sym'" end
 			break
 		end
 	end
-	return {
-		type = t,
-		env = cpenv(env),
-		params = params,
-		...
-	}
+	return { type = type, env = cpenv(env), params = params, ... }
 end
 
 local function normidx(i, l)
@@ -266,7 +258,6 @@ core = {
 	["list"] = function(env, ...) return evallist(env, ...) end,
 
 	['eval'] = function(env, s)
-		require 'debugger'()
 		local res
 		local oldInput = input
 		input = check(eval(s, env), "string")
