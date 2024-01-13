@@ -246,7 +246,7 @@ core = {
 		wstr'\n'
 	end,
 	["list"] = function(env, ...) return dolist(true, env, ...) end,
-	["type"] = function(env, ...) return typename(eval(({...})[1], env)) end,
+	["type"] = function(env, o) return typename(eval(o, env)) end,
 
 	['eval'] = function(env, s)
 		local res
@@ -287,17 +287,29 @@ core = {
 	end,
 
 	["def"] = function(env, var, val)
-		globals[check(var, "symbol").sym] = eval(val, env)
+		setenv(globals, check(var, "symbol").sym, eval(val, env))
 	end,
+
+	-- TODO(thacuber2a03): repeated code
 
 	["set"] = function(env, ...)
 		local args = {...}
 		if #args % 2 ~= 0 then err "not enough values for each key" end
 		for i=1, #args, 2 do
-			local v = eval(args[i+1], env)
 			local s = check(args[i], "symbol").sym
+			local v = eval(args[i+1], env)
 			local _, e = getenv(env, s)
 			setenv(e or env, s, v)
+		end
+	end,
+
+	["let"] = function(env, ...)
+		local args = {...}
+		if #args % 2 ~= 0 then err "not enough values for each key" end
+		for i=1, #args, 2 do
+			local s = check(args[i], "symbol").sym
+			local v = eval(args[i+1], env)
+			setenv(env, s, v)
 		end
 	end,
 

@@ -70,12 +70,12 @@ compiles all it's arguments into a new list.
 
 begins a new environment, and evaluates each of it's arguments. returns the last one.
 
-- `(func params & exprs)`
+- `(func params ... )`
 
 makes and returns a "func".
 unlike corefuncs, funcs' contents can be printed, and can store the value of the variables in the environment they're in for later use ("close over" them, closures).
 
-- `(macro params & exprs)`
+- `(macro params ... )`
 
 makes and returns a "macro".
 macros are like funcs, but their contents are evaluated *twice*, one to get the code to evaluate and another to actually evaluate it. this behavior allows metaprogramming, such as adding another way to declare funcs.
@@ -112,6 +112,10 @@ repeats for every other pair of `sym`s and `val`s there is.
 - `(def sym val)`
 
 misleadingly named, binds `val` to `sym` in the global environment.
+
+- `(let sym val ...)`
+
+binds `sym` to `val` and so on like `set` does, but forces local variable declaration and assignment.
 
 - `(first list)`
 
