@@ -1,10 +1,7 @@
 #!/bin/env lua
-local file = nil
-if #arg >= 1 then file = io.open(arg[1], "rb") end
+local file; if #arg >= 1 then file = io.open(arg[1], "rb") end
 
-local lnil = {}
-local t = {}
-
+local lnil, t
 local c
 
 local function wstr(o) return io.write(tostring(o)) end
@@ -14,9 +11,12 @@ local function delim() return c:find"[ \n\t\r;()']" end
 
 local function sym(s) return setmetatable({sym=s},{__tostring=function() return s end}) end
 local function err(e) error(setmetatable({},{__tostring=function() return "error: "..e.."\n" end})) end
+local function mkenv(p) return { outer = p, data = {} } end
 local function atom(o) return o == lnil or o == t or type(o)~='table' or o.sym or o.type end
 local function issym(o) return type(o)=='table' and o.sym end
 local function hastype(o) return type(o)=='table' and o.type end
+
+lnil, t = sym "lnil", sym "t"
 
 local buf, input = "", ""
 
@@ -30,7 +30,7 @@ end
 
 local qlookup = {
 	["'"] = { "quote", "quote" },
-	[','] = { "comma", "eval" },
+	[','] = { "comma", "unquote" },
 }
 
 local esc = {
@@ -97,8 +97,8 @@ local function read()
 	return res
 end
 
-local eval
-local write
+local eval, write, core
+local globals = mkenv()
 
 local function typename(o)
 	if atom(o) then
@@ -141,35 +141,52 @@ local function equal(env, a, b)
 	return tobool(a == b)
 end
 
-local function arithop(f, anyVal)
+local function arithop(f)
 	-- just a fancy "reduce"
 	return function(env, ...)
 		local args = {...}
-		local acc = eval(args[1], env)
+		local acc = check(eval(args[1], env), "number")
 		for i=2, #args do
-			local v = eval(args[i], env)
+			local v = check(eval(args[i], env), "number")
 			acc = f(acc, v)
 		end
 		return acc
 	end
 end
 
-local function dolist(env, ...)
+local function dolist(evlst, env, ...)
 	local res
-	for _,v in ipairs{...} do res = eval(v, env) end
+	if evlst then res = {} end
+	for i,v in ipairs{...} do
+		v = eval(v, env)
+		if evlst then res[i] = v else res = v end
+	end
 	return res
 end
 
-local core
-local globals = {}
+local function setenv(e, k, v) e.data[k] = v end
 
 local function getenv(env, k)
-	if env[k] then
-		return env[k], env
+	if env.data[k] then
+		return env.data[k], env
 	elseif env.outer then
 		return getenv(env.outer, k)
 	end
 	return core[k] or lnil
+end
+
+local function closure(type, env, params, ...)
+	if not params then err "not enough arguments to 'func'" end
+	check(params, "list")
+	for i=1, #params do
+		check(params[i], "symbol")
+		if params[i].sym == "&" then
+			if typename(params[i + 1]) ~= "symbol" then err "expected symbol after '&'" end
+			if i + 1 ~= #params then err "params after '& sym'" end
+			break
+		end
+	end
+	return { type = type, env = env, params = params, ... }
 end
 
 local function normidx(i, l)
@@ -219,7 +236,7 @@ core = {
 	["not"] = function(env, o) return tobool(not frombool(eval(o, env))) end,
 
 	["quote"] = function(_, o) return o end,
-	["eval"] = function(env, o) return eval(o, env) end,
+	["unquote"] = function(env, o) return eval(o, env) end,
 	["print"] = function(env, ...)
 		local args = {...}
 		for i,v in ipairs(args) do
@@ -228,26 +245,25 @@ core = {
 		end
 		wstr'\n'
 	end,
-	["list"] = function(env, ...)
-		local res = {}
-		for i,v in ipairs{...} do res[i] = eval(v, env) end
+	["list"] = function(env, ...) return dolist(true, env, ...) end,
+	["type"] = function(env, o) return typename(eval(o, env)) end,
+
+	['eval'] = function(env, s)
+		local res
+		local oldInput = input
+		input = check(eval(s, env), "string")
+		while input ~= "" do
+			nch()
+			local r = read()
+			if r == rparen then err "stray ')'" end
+			res = eval(r, mkenv(globals))
+		end
+		input = oldInput
 		return res
 	end,
-
-	['do'] = function(env, ...)
-		return dolist({ outer = env }, ...)
-	end,
-	['func'] = function(env, params, ...)
-		if not params then err "not enough arguments to 'func'" end
-		check(params, "list")
-		for i=1, #params do check(params[i], "symbol") end
-		return {
-			type = "func",
-			env = env,
-			params = params,
-			...
-		}
-	end,
+	['do'] = function(env, ...) return dolist(false, mkenv(env), ...) end,
+	['func'] = function(env, params, ...) return closure("func", env, params, ...) end,
+	['macro'] = function(env, params, ...) return closure("macro", env, params, ...) end,
 	['if'] = function(env, ...)
 		local args = {...}
 		local i = 1
@@ -265,35 +281,46 @@ core = {
 		local res
 		local cond = (select(1, ...))
 		while frombool(eval(cond, env)) do
-			res = dolist({ outer = env }, select(2, ...))
+			res = dolist(false, mkenv(env), select(2, ...))
 		end
 		return res
 	end,
 
 	["def"] = function(env, var, val)
-		globals[check(var, "symbol").sym] = eval(val, env)
+		setenv(globals, check(var, "symbol").sym, eval(val, env))
 	end,
+
+	-- TODO(thacuber2a03): repeated code
+
 	["set"] = function(env, ...)
 		local args = {...}
 		if #args % 2 ~= 0 then err "not enough values for each key" end
 		for i=1, #args, 2 do
-			local v = eval(args[i+1], env)
 			local s = check(args[i], "symbol").sym
+			local v = eval(args[i+1], env)
 			local _, e = getenv(env, s)
-			if e then e[s] = v else env[s] = v end
+			setenv(e or env, s, v)
 		end
 	end,
 
-	["first"] = function(env, list)
-		return check(eval(list, env), "list")[1]
+	["let"] = function(env, ...)
+		local args = {...}
+		if #args % 2 ~= 0 then err "not enough values for each key" end
+		for i=1, #args, 2 do
+			local s = check(args[i], "symbol").sym
+			local v = eval(args[i+1], env)
+			setenv(env, s, v)
+		end
 	end,
+
+	["first"] = function(env, list) return check(eval(list, env), "list")[1] end,
+
 	["rest"] = function(env, list)
-		local res = { select(2,
-			table.unpack(check(eval(list, env), "list"))
-		) }
+		local res = { select(2, table.unpack(check(eval(list, env), "list"))) }
 		if #res == 0 then return lnil end
 		return res
 	end,
+
 	["list?"] = function(env, v)
 		return tobool(typename(eval(v, env)) == "list")
 	end,
@@ -313,9 +340,7 @@ core = {
 	end,
 	["concat"] = function(env, l, m)
 		local res = { table.unpack(check(eval(l, env), "list")) }
-		for _,v in ipairs(check(eval(m, env), "list")) do
-			res[#res+1] = v
-		end
+		for _,v in ipairs(check(eval(m, env), "list")) do res[#res+1] = v end
 		return res
 	end,
 	["slice"] = function(env, v, a, b)
@@ -333,12 +358,6 @@ core = {
 	end,
 }
 
-local function copyenv(env)
-	local newenv = {}
-	for k,v in pairs(env) do newenv[k] = v end
-	return newenv
-end
-
 eval = function(o, env)
 	if atom(o) then
 		if issym(o) then return getenv(env, o.sym) end
@@ -347,16 +366,25 @@ eval = function(o, env)
 
 	local first = eval(o[1], env)
 	local type = typename(first)
+	local ismac = type == "macro"
 	if type == "corefunc" then
 		return first(env, select(2, table.unpack(o))) or lnil
-	elseif type == "func" then
-		local fnenv = { outer = first.env }
-		if #first.params ~= #o-1 then err "not enough arguments" end
+	elseif type == "func" or ismac then
 		for i=2, #o do
-			fnenv[first.params[i-1].sym]
-				= eval(o[i], fnenv)
+			local v = o[i]
+			if not ismac then v = eval(v, env) end
+			local s = first.params[i-1].sym
+			if s == '&' then
+				s = first.params[i].sym
+				setenv(first.env, s, dolist(true, env, select(i, table.unpack(o))))
+				break
+			else
+				setenv(first.env, s, v)
+			end
 		end
-		return dolist(fnenv, table.unpack(first))
+		local res = dolist(false, first.env, table.unpack(first))
+		if ismac then res = eval(res, env) end
+		return res
 	else
 		err "uncallable object"
 	end
@@ -366,8 +394,7 @@ write = function(o)
 	if atom(o) then
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
-		elseif type == "func" then
-			write{ sym"func", o.params, table.unpack(o) }
+		elseif type == "func" then write{ sym"func", o.params, table.unpack(o) }
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end

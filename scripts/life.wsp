@@ -1,0 +1,89 @@
+; adapted from rxi/fe's version
+; https://github.com/rxi/fe/blob/master/scripts/life.fe
+; doesn't yet work!
+
+(def nth (func (n lst) (first (slice lst n n)) ))
+
+(def rev (func (lst)
+	(let res nil)
+	(while lst
+		(set res (cons (first lst) res))
+		(set lst (rest lst))
+	)
+	res
+))
+
+(def map (func (f lst)
+	(let res nil)
+	(while lst
+		(set res (cons (f (first lst)) res))
+		(set lst (rest lst))
+	)
+	(rev res)
+))
+
+(def print-grid (func (grid)
+	(map
+		(func (row)
+			(map (func (x) (if (= x 0) '- '#)) row)
+		)
+		grid
+	)
+))
+
+(def get-cell (func (grid x y) (or (nth x (nth y grid)) 0) ))
+
+(def next-cell (func (grid cell x y)
+	(let n (+
+		(get-cell grid (- x 1)  (- y 1))
+		(get-cell grid (- x 1)  y      )
+		(get-cell grid (- x 1)  (+ y 1))
+		(get-cell grid x        (- y 1))
+		(get-cell grid x        (+ y 1))
+		(get-cell grid (+ x 1)  (- y 1))
+		(get-cell grid (+ x 1)  y      )
+		(get-cell grid (+ x 1)  (+ y 1))
+	))
+
+	(if
+		(and (is cell 1) (or (= n 2) (= n 3))) 1
+		(and (is cell 0) (= n 3)) 1
+		0
+	)
+))
+
+(def next-grid (func (grid)
+	(let y -1)
+	(map
+		(func (row)
+			(set y (+ y 1))
+			(let x -1)
+			(map
+				(func (cell)
+					(set x (+ x 1))
+					(next-cell grid cell x y)
+				)
+				row
+			)
+		)
+		grid
+	)
+))
+
+(def life (func (n grid)
+	(let i 1)
+	(while (<= i n)
+		(print ">> iteration" i)
+		(print-grid grid)
+		(print)
+		(set grid (next-grid grid))
+		(set i (+ i 1))
+	)
+))
+
+; blinker in a 3x3 universe
+(life 5 '(
+	(0 1 0)
+	(0 1 0)
+	(0 1 0)
+))

@@ -15,7 +15,7 @@ this is what came out of that question, apparently
 
 ## todo
 
-- [ ] implement functions and macros
+- [x] implement functions and macros
 - [ ] more list manipulation functions
 - [ ] more string manipulation functions
 - [ ] make it ***smaller***

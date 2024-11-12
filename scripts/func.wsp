@@ -1,5 +1,5 @@
-(set reverse (func (l)
-	(set res nil)
+(def reverse (func (l)
+	(let res nil)
 	(while l
 		(set res (cons (first l) res))
 		(set l (rest l))
@@ -7,5 +7,5 @@
 	res
 ))
 
-(set list '(hello there world))
+(def list '(hello there world))
 (print (reverse list))
