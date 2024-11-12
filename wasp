@@ -367,7 +367,7 @@ write = function(o)
 		local type = typename(o)
 		if type == "corefunc" then wstr "<corefunc>"
 		elseif type == "func" then
-			write{ sym"func", o.params, o }
+			write{ sym"func", o.params, table.unpack(o) }
 		elseif type == "t" then wstr "t"
 		elseif type == "nil" then wstr "nil"
 		else wstr(o) end
